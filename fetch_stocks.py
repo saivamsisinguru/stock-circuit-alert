@@ -1,7 +1,7 @@
 import os
 import yfinance as yf
 from supabase import create_client
-from nsetools import NSE
+from nsetools import Nse
 
 SUPABASE_URL = os.environ["SUPABASE_URL"]
 SUPABASE_KEY = os.environ["SUPABASE_KEY"]
@@ -11,10 +11,8 @@ MAX_PRICE = 500
 
 def fetch_all_nse_symbols():
     """Returns a list of all NSE stock symbols."""
-    nse = NSE()
-    # get_stock_codes() returns a dict: {'SYMBOL': 'Company Name', ...}
+    nse = Nse()
     stock_dict = nse.get_stock_codes()
-    # Remove the first key ('Symbol') and empty ones
     symbols = [s for s in stock_dict.keys() if s and s != 'Symbol']
     return symbols
 
