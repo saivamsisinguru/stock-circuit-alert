@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
   <title>Stock Circuit Alerts</title>
   <link rel="manifest" href="manifest.json">
+  <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black">
   <meta name="theme-color" content="#1a1a2e">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
@@ -30,59 +30,42 @@
     <button onclick="login()">Login</button>
     <p class="error" id="loginError"></p>
   </div>
-
   <div id="dashboard" class="container" style="display:none">
     <h1>📈 Stock Circuit Dashboard</h1>
-
     <label>Stocks (comma separated)</label>
     <textarea id="stocks" rows="3" placeholder="RELIANCE.NS,TATAMOTORS.NS"></textarea>
-
     <label>Circuit Percent (%)</label>
     <input type="number" id="circuit_percent" placeholder="20">
-
     <label>Near Threshold (%)</label>
     <input type="number" id="near_threshold" placeholder="95">
-
     <label>Max Price (₹)</label>
     <input type="number" id="max_price" placeholder="500">
-
     <label>Test Mode</label>
-    <select id="test_mode">
-      <option value="false">Off</option>
-      <option value="true">On</option>
-    </select>
-
+    <select id="test_mode"><option value="false">Off</option><option value="true">On</option></select>
     <button onclick="saveConfig()">💾 Save Settings</button>
     <p class="success" id="saveSuccess"></p>
-
     <hr>
-
     <h2>🔔 Push Notifications</h2>
     <div id="pushControls">
       <button id="subscribeBtn" onclick="subscribeToPush()">Enable Push Notifications</button>
       <button id="unsubscribeBtn" style="display:none" onclick="unsubscribePush()">Disable Push Notifications</button>
       <p id="pushStatus"></p>
     </div>
-
     <button onclick="logout()" style="background:#dc3545">Logout</button>
   </div>
-
   <script>
-    // ---------- CONFIGURATION (replace these two!) ----------
     const SUPABASE_URL = "https://xwuajufeclbgmepazoqm.supabase.co";
     const SUPABASE_ANON_KEY = "sb_publishable_O0n5F8ccaaV-KLM6BQkWCQ_0Va-5pqU";
     const VAPID_PUBLIC_KEY = "BIwtGjxw08FT7d21CUnonzKDhHnCi5Io710AJ-u7P4rz4bp-TVobm8Dj2YPQTT7uVnQCwJX38OmZzs7-GTiq7Bw";
-    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const client = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
     let configPassword = "";
 
-    // ---------- LOAD PASSWORD ----------
     async function loadPassword() {
-      const { data, error } = await supabase.from('config').select('value').eq('key', 'password').single();
+      const { data, error } = await client.from('config').select('value').eq('key', 'password').single();
       if (!error && data) configPassword = data.value;
     }
     loadPassword();
 
-    // ---------- LOGIN ----------
     function login() {
       const pw = document.getElementById("passwordInput").value;
       if (pw === configPassword) {
@@ -95,9 +78,8 @@
       }
     }
 
-    // ---------- LOAD CURRENT SETTINGS ----------
     async function loadCurrentConfig() {
-      const { data, error } = await supabase.from('config').select('*');
+      const { data, error } = await client.from('config').select('*');
       if (error) return;
       data.forEach(row => {
         const el = document.getElementById(row.key);
@@ -105,7 +87,6 @@
       });
     }
 
-    // ---------- SAVE SETTINGS ----------
     async function saveConfig() {
       const updates = [
         { key: 'stocks', value: document.getElementById('stocks').value },
@@ -115,16 +96,15 @@
         { key: 'test_mode', value: document.getElementById('test_mode').value }
       ];
       for (let u of updates) {
-        await supabase.from('config').upsert(u);
+        await client.from('config').upsert(u);
       }
       document.getElementById("saveSuccess").innerText = "Settings saved!";
       setTimeout(() => document.getElementById("saveSuccess").innerText = "", 3000);
     }
 
-    // ---------- PUSH SUBSCRIPTION ----------
     async function checkPushSubscription() {
       if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
-        document.getElementById("pushStatus").innerText = "Push not supported on this browser.";
+        document.getElementById("pushStatus").innerText = "Push not supported.";
         return;
       }
       const reg = await navigator.serviceWorker.register('/sw.js');
@@ -132,7 +112,7 @@
       if (subscription) {
         document.getElementById("subscribeBtn").style.display = "none";
         document.getElementById("unsubscribeBtn").style.display = "block";
-        document.getElementById("pushStatus").innerText = "Push notifications enabled.";
+        document.getElementById("pushStatus").innerText = "Push enabled.";
       } else {
         document.getElementById("subscribeBtn").style.display = "block";
         document.getElementById("unsubscribeBtn").style.display = "none";
@@ -145,11 +125,10 @@
         userVisibleOnly: true,
         applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
       });
-      // Save the subscription endpoint as token (FCM uses the endpoint itself)
       const token = subscription.endpoint;
-      const { error } = await supabase.from('push_tokens').upsert({ token });
+      const { error } = await client.from('push_tokens').upsert({ token });
       if (error) {
-        document.getElementById("pushStatus").innerText = "Error saving token: " + error.message;
+        document.getElementById("pushStatus").innerText = "Error: " + error.message;
       } else {
         document.getElementById("pushStatus").innerText = "Push enabled!";
         document.getElementById("subscribeBtn").style.display = "none";
@@ -161,7 +140,7 @@
       const reg = await navigator.serviceWorker.ready;
       const subscription = await reg.pushManager.getSubscription();
       if (subscription) {
-        await supabase.from('push_tokens').delete().eq('token', subscription.endpoint);
+        await client.from('push_tokens').delete().eq('token', subscription.endpoint);
         await subscription.unsubscribe();
         document.getElementById("pushStatus").innerText = "Push disabled.";
         document.getElementById("subscribeBtn").style.display = "block";
