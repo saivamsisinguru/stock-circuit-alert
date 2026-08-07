@@ -65,6 +65,11 @@ def main():
     near_threshold  = int(cfg.get("near_threshold", "95"))
     max_price       = int(cfg.get("max_price", "500"))
 
+
+    # Temporary test – remove after verifying push
+    send_push("Test Push", "Your pipeline is working!")
+    return
+    
     if not is_market_open():
         print("Market closed, skipping.")
         return
