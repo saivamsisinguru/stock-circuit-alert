@@ -1,1 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Stock Circuit Alerts</title>
+  <link rel="manifest" href="manifest.json">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="theme-color" content="#1a1a2e">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    body { font-family: Arial, sans-serif; background: #f4f4f4; margin: 0; padding: 1rem; }
+    h1 { font-size: 1.4rem; }
+    .container { max-width: 500px; margin: 0 auto; background: white; padding: 1rem; border-radius: 8px; }
+    label { display: block; margin-top: 1rem; font-weight: bold; font-size: 0.9rem; }
+    input, textarea, select, button { width: 100%; padding: 0.6rem; margin-top: 0.3rem; border: 1px solid #ccc; border-radius: 4px; font-size: 1rem; }
+    button { background: #007bff; color: white; border: none; margin-top: 1rem; cursor: pointer; }
+    button:active { background: #0056b3; }
+    .error { color: red; }
+    .success { color: green; }
+    #pushStatus { margin-top: 0.5rem; font-size: 0.9rem; }
+  </style>
+</head>
+<body>
+  <div id="loginScreen" class="container">
+    <h1>🔐 Login</h1>
+    <label>Password</label>
+    <input type="password" id="passwordInput" placeholder="Enter password">
+    <button onclick="login()">Login</button>
+    <p class="error" id="loginError"></p>
+  </div>
 
+  <div id="dashboard" class="container" style="display:none">
+    <h1>📈 Stock Circuit Dashboard</h1>
+
+    <label>Stocks (comma separated)</label>
+    <textarea id="stocks" rows="3" placeholder="RELIANCE.NS,TATAMOTORS.NS"></textarea>
+
+    <label>Circuit Percent (%)</label>
+    <input type="number" id="circuit_percent" placeholder="20">
+
+    <label>Near Threshold (%)</label>
+    <input type="number" id="near_threshold" placeholder="95">
+
+    <label>Max Price (₹)</label>
+    <input type="number" id="max_price" placeholder="500">
+
+    <label>Test Mode</label>
+    <select id="test_mode">
+      <option value="false">Off</option>
+      <option value="true">On</option>
+    </select>
+
+    <button onclick="saveConfig()">💾 Save Settings</button>
+    <p class="success" id="saveSuccess"></p>
+
+    <hr>
+
+    <h2>🔔 Push Notifications</h2>
+    <div id="pushControls">
+      <button id="subscribeBtn" onclick="subscribeToPush()">Enable Push Notifications</button>
+      <button id="unsubscribeBtn" style="display:none" onclick="unsubscribePush()">Disable Push Notifications</button>
+      <p id="pushStatus"></p>
+    </div>
+
+    <button onclick="logout()" style="background:#dc3545">Logout</button>
+  </div>
+
+  <script>
+    // ---------- CONFIGURATION (replace these two!) ----------
+    const SUPABASE_URL = "https://xwuajufeclbgmepazoqm.supabase.co";
+    const SUPABASE_ANON_KEY = "YOUR_ANON_KEY";   // <-- REPLACE with your Publishable key
+    const VAPID_PUBLIC_KEY = "YOUR_VAPID_KEY";   // <-- REPLACE with your VAPID key from Firebase
+
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    let configPassword = "";
+
+    // ---------- LOAD PASSWORD ----------
+    async function loadPassword() {
+      const { data, error } = await supabase.from('config').select('value').eq('key', 'password').single();
+      if (!error && data) configPassword = data.value;
+    }
+    loadPassword();
+
+    // ---------- LOGIN ----------
+    function login() {
+      const pw = document.getElementById("passwordInput").value;
+      if (pw === configPassword) {
+        document.getElementById("loginScreen").style.display = "none";
+        document.getElementById("dashboard").style.display = "block";
+        loadCurrentConfig();
+        checkPushSubscription();
+      } else {
+        document.getElementById("loginError").innerText = "Wrong password";
+      }
+    }
+
+    // ---------- LOAD CURRENT SETTINGS ----------
+    async function loadCurrentConfig() {
+      const { data, error } = await supabase.from('config').select('*');
+      if (error) return;
+      data.forEach(row => {
+        const el = document.getElementById(row.key);
+        if (el) el.value = row.value;
+      });
+    }
+
+    // ---------- SAVE SETTINGS ----------
+    async function saveConfig() {
+      const updates = [
+        { key: 'stocks', value: document.getElementById('stocks').value },
+        { key: 'circuit_percent', value: document.getElementById('circuit_percent').value },
+        { key: 'near_threshold', value: document.getElementById('near_threshold').value },
+        { key: 'max_price', value: document.getElementById('max_price').value },
+        { key: 'test_mode', value: document.getElementById('test_mode').value }
+      ];
+      for (let u of updates) {
+        await supabase.from('config').upsert(u);
+      }
+      document.getElementById("saveSuccess").innerText = "Settings saved!";
+      setTimeout(() => document.getElementById("saveSuccess").innerText = "", 3000);
+    }
+
+    // ---------- PUSH SUBSCRIPTION ----------
+    async function checkPushSubscription() {
+      if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+        document.getElementById("pushStatus").innerText = "Push not supported on this browser.";
+        return;
+      }
+      const reg = await navigator.serviceWorker.register('/sw.js');
+      const subscription = await reg.pushManager.getSubscription();
+      if (subscription) {
+        document.getElementById("subscribeBtn").style.display = "none";
+        document.getElementById("unsubscribeBtn").style.display = "block";
+        document.getElementById("pushStatus").innerText = "Push notifications enabled.";
+      } else {
+        document.getElementById("subscribeBtn").style.display = "block";
+        document.getElementById("unsubscribeBtn").style.display = "none";
+      }
+    }
+
+    async function subscribeToPush() {
+      const reg = await navigator.serviceWorker.ready;
+      const subscription = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+      });
+      // Save the subscription endpoint as token (FCM uses the endpoint itself)
+      const token = subscription.endpoint;
+      const { error } = await supabase.from('push_tokens').upsert({ token });
+      if (error) {
+        document.getElementById("pushStatus").innerText = "Error saving token: " + error.message;
+      } else {
+        document.getElementById("pushStatus").innerText = "Push enabled!";
+        document.getElementById("subscribeBtn").style.display = "none";
+        document.getElementById("unsubscribeBtn").style.display = "block";
+      }
+    }
+
+    async function unsubscribePush() {
+      const reg = await navigator.serviceWorker.ready;
+      const subscription = await reg.pushManager.getSubscription();
+      if (subscription) {
+        await supabase.from('push_tokens').delete().eq('token', subscription.endpoint);
+        await subscription.unsubscribe();
+        document.getElementById("pushStatus").innerText = "Push disabled.";
+        document.getElementById("subscribeBtn").style.display = "block";
+        document.getElementById("unsubscribeBtn").style.display = "none";
+      }
+    }
+
+    function logout() {
+      location.reload();
+    }
+
+    function urlBase64ToUint8Array(base64String) {
+      const padding = '='.repeat((4 - base64String.length % 4) % 4);
+      const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+      const rawData = window.atob(base64);
+      const outputArray = new Uint8Array(rawData.length);
+      for (let i = 0; i < rawData.length; ++i) {
+        outputArray[i] = rawData.charCodeAt(i);
+      }
+      return outputArray;
+    }
+  </script>
+</body>
+</html>
