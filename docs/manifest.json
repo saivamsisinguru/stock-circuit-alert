@@ -1,0 +1,9 @@
+{
+  "name": "Stock Circuit Alerts",
+  "short_name": "Stocks",
+  "start_url": "/stock-circuit-alert/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#1a1a2e",
+  "icons": []
+}
