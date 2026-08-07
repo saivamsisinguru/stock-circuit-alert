@@ -19,13 +19,13 @@ def load_config():
 
 # ---------- DUMMY PUSH (replace later) ----------
 def send_push(title, body):
-    # Get the function URL from config (already loaded in cfg)
+    # Load config inside the function to access the push URL
+    cfg = load_config()
     url = cfg.get("push_function_url")
     if not url:
         print("No push_function_url set, skipping push.")
         return
 
-    # Fetch all device tokens from the push_tokens table
     try:
         res = supabase.table("push_tokens").select("token").execute()
         tokens = [row["token"] for row in res.data]
@@ -37,7 +37,6 @@ def send_push(title, body):
         print("No device tokens registered, skipping push.")
         return
 
-    # Send push to each token
     for token in tokens:
         try:
             resp = requests.post(url, json={
@@ -45,7 +44,7 @@ def send_push(title, body):
                 "body": body,
                 "token": token
             }, timeout=10)
-            print(f"Push to {token[-6:]}: {resp.status_code} {resp.text}")
+            print(f"Push to {token[-6:]}: {resp.status_code} {resp.text[:80]}")
         except Exception as e:
             print(f"Push error for {token[-6:]}: {e}")
 
