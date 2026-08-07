@@ -1,3 +1,4 @@
+import requests
 import os
 import yfinance as yf
 from datetime import datetime, date, timedelta
@@ -18,8 +19,35 @@ def load_config():
 
 # ---------- DUMMY PUSH (replace later) ----------
 def send_push(title, body):
-    print(f"PUSH: {title} | {body}")
-    # In the next step, we'll call your Supabase Edge Function here
+    # Get the function URL from config (already loaded in cfg)
+    url = cfg.get("push_function_url")
+    if not url:
+        print("No push_function_url set, skipping push.")
+        return
+
+    # Fetch all device tokens from the push_tokens table
+    try:
+        res = supabase.table("push_tokens").select("token").execute()
+        tokens = [row["token"] for row in res.data]
+    except Exception as e:
+        print(f"Failed to fetch push tokens: {e}")
+        return
+
+    if not tokens:
+        print("No device tokens registered, skipping push.")
+        return
+
+    # Send push to each token
+    for token in tokens:
+        try:
+            resp = requests.post(url, json={
+                "title": title,
+                "body": body,
+                "token": token
+            }, timeout=10)
+            print(f"Push to {token[-6:]}: {resp.status_code} {resp.text}")
+        except Exception as e:
+            print(f"Push error for {token[-6:]}: {e}")
 
 # ---------- MARKET HOURS (IST) ----------
 def is_market_open():
