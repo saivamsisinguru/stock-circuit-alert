@@ -1,7 +1,7 @@
 import requests
 import os
 import yfinance as yf
-from datetime import datetime, date, timedelta
+from datetime import datetime, date, timedelta, timezone
 from supabase import create_client
 
 # ---------- CONNECT TO SUPABASE ----------
@@ -50,7 +50,7 @@ def send_push(title, body):
 
 # ---------- MARKET HOURS (IST) ----------
 def is_market_open():
-    ist = datetime.now(datetime.timezone.utc) + timedelta(hours=5, minutes=30)
+    ist = datetime.now(timezone.utc) + timedelta(hours=5, minutes=30)
     if ist.weekday() >= 5:
         return False
     start = ist.replace(hour=9, minute=15, second=0, microsecond=0)
