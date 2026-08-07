@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
   <title>Stock Circuit Alerts</title>
-  <link rel="manifest" href="manifest.json">
+  <link rel="manifest" href="/stock-circuit-alert/manifest.json">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#1a1a2e">
@@ -107,7 +107,7 @@
         document.getElementById("pushStatus").innerText = "Push not supported.";
         return;
       }
-      const reg = await navigator.serviceWorker.register('/sw.js');
+      const reg = await navigator.serviceWorker.register('/stock-circuit-alert/sw.js');
       const subscription = await reg.pushManager.getSubscription();
       if (subscription) {
         document.getElementById("subscribeBtn").style.display = "none";
