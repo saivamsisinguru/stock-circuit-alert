@@ -23,7 +23,7 @@ def send_push(title, body):
 
 # ---------- MARKET HOURS (IST) ----------
 def is_market_open():
-    ist = datetime.utcnow() + timedelta(hours=5, minutes=30)
+    ist = datetime.now(datetime.timezone.utc) + timedelta(hours=5, minutes=30)
     if ist.weekday() >= 5:
         return False
     start = ist.replace(hour=9, minute=15, second=0, microsecond=0)
@@ -43,7 +43,7 @@ def main():
         return
 
     today_str = str(date.today())
-    ist_time_str = (datetime.utcnow() + timedelta(hours=5, minutes=30)).strftime("%H:%M:%S")
+    ist_time_str = (datetime.now(datetime.timezone.utc) + timedelta(hours=5, minutes=30)).strftime("%H:%M:%S")
 
     for symbol in stocks:
         symbol = symbol.strip()
