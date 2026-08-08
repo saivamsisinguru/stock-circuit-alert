@@ -69,10 +69,7 @@
     };
     firebase.initializeApp(firebaseConfig);
     const messaging = firebase.messaging();
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('sw.js')
-        .then(reg => messaging.useServiceWorker(reg));
-    }
+  
 
     async function loadPassword() {
       const { data, error } = await client.from('config').select('value').eq('key', 'password').single();
@@ -128,26 +125,35 @@
     }
 
     async function subscribeToPush() {
-      try {
-        const permission = await Notification.requestPermission();
-        if (permission !== 'granted') {
-          document.getElementById("pushStatus").innerText = "Permission denied.";
-          return;
-        }
-        const token = await messaging.getToken({ vapidKey: 'BIwtGjxw08FT7d21CUnonzKDhHnCi5Io710AJ-u7P4rz4bp-TVobm8Dj2YPQTT7uVnQCwJX38OmZzs7-GTiq7Bw' });
-        await fetch('https://xwuajufeclbgmepazoqm.supabase.co/functions/v1/push-notify', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ topic_subscribe: 'circuit_alerts', token })
-        });
-        await client.from('push_tokens').upsert({ token });
-        document.getElementById("pushStatus").innerText = "Push enabled!";
-        document.getElementById("subscribeBtn").style.display = "none";
-        document.getElementById("unsubscribeBtn").style.display = "block";
-      } catch (e) {
-        document.getElementById("pushStatus").innerText = "Error: " + e.message;
-      }
+  try {
+    const permission = await Notification.requestPermission();
+    if (permission !== 'granted') {
+      document.getElementById("pushStatus").innerText = "Permission denied.";
+      return;
     }
+
+    // Manually register the service worker and pass it to getToken
+    const reg = await navigator.serviceWorker.register('sw.js');
+    const token = await messaging.getToken({
+      vapidKey: 'BIwtGjxw08FT7d21CUnonzKDhHnCi5Io710AJ-u7P4rz4bp-TVobm8Dj2YPQTT7uVnQCwJX38OmZzs7-GTiq7Bw',
+      serviceWorkerRegistration: reg
+    });
+
+    // Subscribe to topic
+    await fetch('https://xwuajufeclbgmepazoqm.supabase.co/functions/v1/push-notify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ topic_subscribe: 'circuit_alerts', token })
+    });
+
+    await client.from('push_tokens').upsert({ token });
+    document.getElementById("pushStatus").innerText = "Push enabled!";
+    document.getElementById("subscribeBtn").style.display = "none";
+    document.getElementById("unsubscribeBtn").style.display = "block";
+  } catch (e) {
+    document.getElementById("pushStatus").innerText = "Error: " + e.message;
+  }
+}
 
     async function unsubscribePush() {
       try {
