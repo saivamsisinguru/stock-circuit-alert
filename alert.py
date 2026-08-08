@@ -27,13 +27,26 @@ def send_push(title, body):
         return
 
     try:
-        resp = requests.post(url, json={
-            "title": title,
-            "body": body
-        }, timeout=10)
-        print(f"Push to topic: {resp.status_code} {resp.text[:80]}")
+        res = supabase.table("push_tokens").select("token").execute()
+        tokens = [row["token"] for row in res.data]
     except Exception as e:
-        print(f"Push error: {e}")
+        print(f"Failed to fetch push tokens: {e}")
+        return
+
+    if not tokens:
+        print("No device tokens registered, skipping push.")
+        return
+
+    for token in tokens:
+        try:
+            resp = requests.post(url, json={
+                "title": title,
+                "body": body,
+                "token": token
+            }, timeout=10)
+            print(f"Push to {token[-6:]}: {resp.status_code} {resp.text[:80]}")
+        except Exception as e:
+            print(f"Push error for {token[-6:]}: {e}")
 
 # ---------- MARKET HOURS (IST) ----------
 def is_market_open():
