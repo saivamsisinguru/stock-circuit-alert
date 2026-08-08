@@ -2,12 +2,12 @@ importScripts('https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js'
 importScripts('https://www.gstatic.com/firebasejs/10.7.1/firebase-messaging-compat.js');
 
 firebase.initializeApp({
-  apiKey: "AIzaSyB1234567890-abcdefghijklmnopqrstuv",
+  apiKey: "AIzaSyCUS3UkIl6J6lXfp6fZZqwvYyCgMNx-Lz4",
   authDomain: "stock-alert-pwa.firebaseapp.com",
   projectId: "stock-alert-pwa",
-  storageBucket: "stock-alert-pwa.appspot.com",
-  messagingSenderId: "YOUR_SENDER_ID",
-  appId: "YOUR_APP_ID"
+  storageBucket: "stock-alert-pwa.firebasestorage.app",
+  messagingSenderId: "249296765321",
+  appId: "1:249296765321:web:88a5b155b574058bbe2158"
 });
 
 const messaging = firebase.messaging();
