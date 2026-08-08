@@ -64,6 +64,9 @@ def main():
     circuit_percent = int(cfg.get("circuit_percent", "20"))
     near_threshold  = int(cfg.get("near_threshold", "95"))
     max_price       = int(cfg.get("max_price", "500"))
+        # TEMPORARY TEST – remove after successful push
+    send_push("🚀 Test Alert", "Your stock alert system is working!")
+    return
 
     if not is_market_open():
         print("Market closed, skipping.")
