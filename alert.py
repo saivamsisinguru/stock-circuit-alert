@@ -26,7 +26,7 @@ def send_push(title, body):
         print("No push_function_url set, skipping push.")
         return
 
-        try:
+    try:
         resp = requests.post(url, json={
             "title": title,
             "body": body
@@ -34,22 +34,6 @@ def send_push(title, body):
         print(f"Push to topic: {resp.status_code} {resp.text[:80]}")
     except Exception as e:
         print(f"Push error: {e}")
-        return
-
-    if not tokens:
-        print("No device tokens registered, skipping push.")
-        return
-
-    for token in tokens:
-        try:
-            resp = requests.post(url, json={
-                "title": title,
-                "body": body,
-                "token": token
-            }, timeout=10)
-            print(f"Push to {token[-6:]}: {resp.status_code} {resp.text[:80]}")
-        except Exception as e:
-            print(f"Push error for {token[-6:]}: {e}")
 
 # ---------- MARKET HOURS (IST) ----------
 def is_market_open():
@@ -65,9 +49,10 @@ def is_market_open():
 def main():
     cfg = load_config()
     circuit_percent = int(cfg.get("circuit_percent", "20"))
-    near_threshold  = int(cfg.get("near_threshold", "95"))
+        near_threshold  = int(cfg.get("near_threshold", "95"))
     max_price       = int(cfg.get("max_price", "500"))
-        # TEMPORARY TEST – remove after successful push
+
+    # TEMPORARY TEST – remove after successful push
     send_push("🚀 Test Alert", "Your stock alert system is working!")
     return
 
