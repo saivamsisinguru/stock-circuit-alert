@@ -26,11 +26,14 @@ def send_push(title, body):
         print("No push_function_url set, skipping push.")
         return
 
-    try:
-        res = supabase.table("push_tokens").select("token").execute()
-        tokens = [row["token"] for row in res.data]
+        try:
+        resp = requests.post(url, json={
+            "title": title,
+            "body": body
+        }, timeout=10)
+        print(f"Push to topic: {resp.status_code} {resp.text[:80]}")
     except Exception as e:
-        print(f"Failed to fetch push tokens: {e}")
+        print(f"Push error: {e}")
         return
 
     if not tokens:
