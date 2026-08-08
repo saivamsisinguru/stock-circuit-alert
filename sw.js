@@ -20,11 +20,3 @@ messaging.onBackgroundMessage((payload) => {
   };
   self.registration.showNotification(notificationTitle, notificationOptions);
 });
-
-// Also handle the default Firebase messaging SW path
-self.addEventListener('install', () => {
-  self.skipWaiting();
-});
-self.addEventListener('activate', () => {
-  clients.claim();
-});
