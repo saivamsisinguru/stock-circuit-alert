@@ -69,9 +69,9 @@ def main():
     send_push("🚀 Test Alert", "Your stock alert system is working!")
     return
 
-    if not is_market_open():
-        print("Market closed, skipping.")
-        return
+   # if not is_market_open():
+    #    print("Market closed, skipping.")
+     #   return
 
     today_str = str(date.today())
     ist_time_str = (datetime.now(timezone.utc) + timedelta(hours=5, minutes=30)).strftime("%H:%M:%S")
