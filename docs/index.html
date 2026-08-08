@@ -70,11 +70,8 @@
   appId: "1:249296765321:web:88a5b155b574058bbe2158"
 };
     firebase.initializeApp(firebaseConfig);
-    const messaging = firebase.messaging();
-// Use the service worker we already have instead of the default one
-navigator.serviceWorker.register('/stock-circuit-alert/sw.js').then((registration) => {
-  messaging.useServiceWorker(registration);
-});
+const messaging = firebase.messaging();
+messaging.useServiceWorker(new ServiceWorker('/stock-circuit-alert/sw.js', {scope: '/stock-circuit-alert/'}));
 
     async function loadPassword() {
       const { data, error } = await client.from('config').select('value').eq('key', 'password').single();
