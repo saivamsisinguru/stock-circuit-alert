@@ -1,6 +1,7 @@
 import os
 import yfinance as yf
-import requests
+import smtplib
+from email.message import EmailMessage
 from datetime import datetime, date, timedelta, timezone
 from supabase import create_client
 import pandas as pd
@@ -18,35 +19,30 @@ def load_config():
         cfg[row["key"]] = row["value"]
     return cfg
 
-# ---------- SEND PUSH (edge function - topic based) ----------
-def send_push(title, body):
+# ---------- SEND EMAIL ----------
+def send_email(subject, body):
     cfg = load_config()
-    url = cfg.get("push_function_url")
-    if not url:
-        print("No push_function_url set, skipping push.")
+    user = os.environ.get("GMAIL_USER")
+    password = os.environ.get("GMAIL_APP_PASSWORD")
+    to_addr = os.environ.get("ALERT_EMAIL", user)
+
+    if not user or not password:
+        print("Gmail credentials missing.")
         return
+
+    msg = EmailMessage()
+    msg.set_content(body)
+    msg["Subject"] = subject
+    msg["From"] = user
+    msg["To"] = to_addr
 
     try:
-        res = supabase.table("push_tokens").select("token").execute()
-        tokens = [row["token"] for row in res.data]
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as smtp:
+            smtp.login(user, password)
+            smtp.send_message(msg)
+        print(f"Email sent: {subject}")
     except Exception as e:
-        print(f"Failed to fetch push tokens: {e}")
-        return
-
-    if not tokens:
-        print("No device tokens registered, skipping push.")
-        return
-
-    for token in tokens:
-        try:
-            resp = requests.post(url, json={
-                "title": title,
-                "body": body,
-                "token": token
-            }, timeout=10)
-            print(f"Push to {token[-6:]}: {resp.status_code} {resp.text[:80]}")
-        except Exception as e:
-            print(f"Push error for {token[-6:]}: {e}")
+        print(f"Email error: {e}")
 
 # ---------- MARKET HOURS (IST) ----------
 def is_market_open():
@@ -65,18 +61,20 @@ def main():
     near_threshold  = int(cfg.get("near_threshold", "95"))
     max_price       = int(cfg.get("max_price", "500"))
 
-    # TEMPORARY TEST – remove after successful push
-    send_push("🚀 Test Alert", "Your stock alert system is working!")
+    # --- TEMPORARY TEST EMAIL (remove after test) ---
+    send_email("✅ Test Alert", "Your stock alert system is working!")
     return
 
-   # if not is_market_open():
-    #    print("Market closed, skipping.")
-     #   return
+    # -------------------------------------------------
+
+    if not is_market_open():
+        print("Market closed, skipping.")
+        return
 
     today_str = str(date.today())
     ist_time_str = (datetime.now(timezone.utc) + timedelta(hours=5, minutes=30)).strftime("%H:%M:%S")
 
-    # ---- FETCH DAILY STOCK LIST (auto-discovered) ----
+    # ---- FETCH DAILY STOCK LIST ----
     print("Fetching stock list from stocks_daily...")
     try:
         db_stocks = supabase.table("stocks_daily").select("symbol, prev_close").execute().data
@@ -109,15 +107,13 @@ def main():
         return
 
     if data.empty:
-        print("No market data yet (maybe pre-open). Skipping.")
+        print("No market data yet. Skipping.")
         return
 
     if len(tickers) == 1:
-        close_prices = data['Close']
-        current_prices = {tickers[0]: close_prices.iloc[-1]}
+        current_prices = {tickers[0]: data['Close'].iloc[-1]}
     else:
-        close_prices = data['Close']
-        current_prices = close_prices.iloc[-1].to_dict()
+        current_prices = data['Close'].iloc[-1].to_dict()
 
     for symbol, prev_close in stocks.items():
         ticker_key = symbol + ".NS"
@@ -143,6 +139,7 @@ def main():
             db = supabase.table("circuit_alerts").select("*").eq("symbol", symbol).execute().data
             rec = db[0] if db else {}
 
+            # ---------- OPEN AT CIRCUIT CHECK ----------
             upper_suppress = False
             if rec.get("upper_circuit_open_date") != today_str:
                 if curr >= upper:
@@ -163,20 +160,21 @@ def main():
             else:
                 lower_suppress = (rec.get("lower_circuit_open_date") == today_str)
 
+            # ---------- ALERTS ----------
             if curr >= upper_near and rec.get("last_upper_near_date") != today_str and not upper_suppress:
-                send_push(f"🚀 {symbol} near UPPER circuit", f"₹{curr:.2f} (Upper: ₹{upper:.2f})")
+                send_email(f"🚀 {symbol} near UPPER circuit", f"₹{curr:.2f} (Upper: ₹{upper:.2f})")
                 supabase.table("circuit_alerts").upsert({"symbol": symbol, "last_upper_near_date": today_str}).execute()
 
             if curr >= upper and rec.get("last_upper_hit_date") != today_str and not upper_suppress:
-                send_push(f"🔴 {symbol} HIT upper circuit!", f"₹{curr:.2f}")
+                send_email(f"🔴 {symbol} HIT upper circuit!", f"₹{curr:.2f}")
                 supabase.table("circuit_alerts").upsert({"symbol": symbol, "last_upper_hit_date": today_str}).execute()
 
             if curr <= lower_near and rec.get("last_lower_near_date") != today_str and not lower_suppress:
-                send_push(f"📉 {symbol} near LOWER circuit", f"₹{curr:.2f} (Lower: ₹{lower:.2f})")
+                send_email(f"📉 {symbol} near LOWER circuit", f"₹{curr:.2f} (Lower: ₹{lower:.2f})")
                 supabase.table("circuit_alerts").upsert({"symbol": symbol, "last_lower_near_date": today_str}).execute()
 
             if curr <= lower and rec.get("last_lower_hit_date") != today_str and not lower_suppress:
-                send_push(f"🟢 {symbol} HIT lower circuit!", f"₹{curr:.2f}")
+                send_email(f"🟢 {symbol} HIT lower circuit!", f"₹{curr:.2f}")
                 supabase.table("circuit_alerts").upsert({"symbol": symbol, "last_lower_hit_date": today_str}).execute()
 
         except Exception as e:
