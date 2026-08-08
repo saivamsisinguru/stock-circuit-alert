@@ -71,6 +71,10 @@
 };
     firebase.initializeApp(firebaseConfig);
     const messaging = firebase.messaging();
+// Use the service worker we already have instead of the default one
+navigator.serviceWorker.register('/stock-circuit-alert/sw.js').then((registration) => {
+  messaging.useServiceWorker(registration);
+});
 
     async function loadPassword() {
       const { data, error } = await client.from('config').select('value').eq('key', 'password').single();
