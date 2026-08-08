@@ -9,6 +9,8 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#1a1a2e">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-messaging-compat.js"></script>
   <style>
     body { font-family: Arial, sans-serif; background: #f4f4f4; margin: 0; padding: 1rem; }
     h1 { font-size: 1.4rem; }
@@ -32,8 +34,6 @@
   </div>
   <div id="dashboard" class="container" style="display:none">
     <h1>📈 Stock Circuit Dashboard</h1>
-    <label>Stocks (comma separated)</label>
-    <textarea id="stocks" rows="3" placeholder="RELIANCE.NS,TATAMOTORS.NS"></textarea>
     <label>Circuit Percent (%)</label>
     <input type="number" id="circuit_percent" placeholder="20">
     <label>Near Threshold (%)</label>
@@ -54,11 +54,23 @@
     <button onclick="logout()" style="background:#dc3545">Logout</button>
   </div>
   <script>
+    // Supabase config
     const SUPABASE_URL = "https://xwuajufeclbgmepazoqm.supabase.co";
     const SUPABASE_ANON_KEY = "sb_publishable_O0n5F8ccaaV-KLM6BQkWCQ_0Va-5pqU";
-    const VAPID_PUBLIC_KEY = "BIwtGjxw08FT7d21CUnonzKDhHnCi5Io710AJ-u7P4rz4bp-TVobm8Dj2YPQTT7uVnQCwJX38OmZzs7-GTiq7Bw";
     const client = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
     let configPassword = "";
+
+    // Firebase config — REPLACE WITH YOUR REAL VALUES from Firebase Console
+    const firebaseConfig = {
+      apiKey: "AIzaSy...",
+      authDomain: "stock-alert-pwa.firebaseapp.com",
+      projectId: "stock-alert-pwa",
+      storageBucket: "stock-alert-pwa.appspot.com",
+      messagingSenderId: "YOUR_SENDER_ID",
+      appId: "YOUR_APP_ID"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const messaging = firebase.messaging();
 
     async function loadPassword() {
       const { data, error } = await client.from('config').select('value').eq('key', 'password').single();
@@ -72,7 +84,7 @@
         document.getElementById("loginScreen").style.display = "none";
         document.getElementById("dashboard").style.display = "block";
         loadCurrentConfig();
-        checkPushSubscription();
+        checkPushState();
       } else {
         document.getElementById("loginError").innerText = "Wrong password";
       }
@@ -89,7 +101,6 @@
 
     async function saveConfig() {
       const updates = [
-        { key: 'stocks', value: document.getElementById('stocks').value },
         { key: 'circuit_percent', value: document.getElementById('circuit_percent').value },
         { key: 'near_threshold', value: document.getElementById('near_threshold').value },
         { key: 'max_price', value: document.getElementById('max_price').value },
@@ -102,65 +113,50 @@
       setTimeout(() => document.getElementById("saveSuccess").innerText = "", 3000);
     }
 
-    async function checkPushSubscription() {
-      if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
-        document.getElementById("pushStatus").innerText = "Push not supported.";
-        return;
-      }
-      const reg = await navigator.serviceWorker.register('/stock-circuit-alert/sw.js');
-      const subscription = await reg.pushManager.getSubscription();
-      if (subscription) {
+    function checkPushState() {
+      if (Notification.permission === 'granted') {
         document.getElementById("subscribeBtn").style.display = "none";
         document.getElementById("unsubscribeBtn").style.display = "block";
         document.getElementById("pushStatus").innerText = "Push enabled.";
       } else {
         document.getElementById("subscribeBtn").style.display = "block";
         document.getElementById("unsubscribeBtn").style.display = "none";
+        document.getElementById("pushStatus").innerText = "";
       }
     }
 
     async function subscribeToPush() {
-      const reg = await navigator.serviceWorker.ready;
-      const subscription = await reg.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
-      });
-      const token = subscription.endpoint.split('/').pop();
-      const { error } = await client.from('push_tokens').upsert({ token });
-      if (error) {
-        document.getElementById("pushStatus").innerText = "Error: " + error.message;
-      } else {
+      try {
+        const permission = await Notification.requestPermission();
+        if (permission !== 'granted') {
+          document.getElementById("pushStatus").innerText = "Permission denied.";
+          return;
+        }
+        const token = await messaging.getToken({ vapidKey: 'BIwtGjxw08FT7d21CUnonzKDhHnCi5Io710AJ-u7P4rz4bp-TVobm8Dj2YPQTT7uVnQCwJX38OmZzs7-GTiq7Bw' });
+        await client.from('push_tokens').upsert({ token });
         document.getElementById("pushStatus").innerText = "Push enabled!";
         document.getElementById("subscribeBtn").style.display = "none";
         document.getElementById("unsubscribeBtn").style.display = "block";
+      } catch (e) {
+        document.getElementById("pushStatus").innerText = "Error: " + e.message;
       }
     }
 
     async function unsubscribePush() {
-      const reg = await navigator.serviceWorker.ready;
-      const subscription = await reg.pushManager.getSubscription();
-      if (subscription) {
-        await client.from('push_tokens').delete().eq('token', subscription.endpoint);
-        await subscription.unsubscribe();
+      try {
+        const token = await messaging.getToken({ vapidKey: 'BIwtGjxw08FT7d21CUnonzKDhHnCi5Io710AJ-u7P4rz4bp-TVobm8Dj2YPQTT7uVnQCwJX38OmZzs7-GTiq7Bw' });
+        await messaging.deleteToken();
+        await client.from('push_tokens').delete().eq('token', token);
         document.getElementById("pushStatus").innerText = "Push disabled.";
         document.getElementById("subscribeBtn").style.display = "block";
         document.getElementById("unsubscribeBtn").style.display = "none";
+      } catch (e) {
+        document.getElementById("pushStatus").innerText = "Error: " + e.message;
       }
     }
 
     function logout() {
       location.reload();
-    }
-
-    function urlBase64ToUint8Array(base64String) {
-      const padding = '='.repeat((4 - base64String.length % 4) % 4);
-      const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
-      const rawData = window.atob(base64);
-      const outputArray = new Uint8Array(rawData.length);
-      for (let i = 0; i < rawData.length; ++i) {
-        outputArray[i] = rawData.charCodeAt(i);
-      }
-      return outputArray;
     }
   </script>
 </body>
