@@ -125,7 +125,7 @@
         userVisibleOnly: true,
         applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
       });
-      const token = subscription.endpoint;
+      const token = subscription.endpoint.split('/').pop();
       const { error } = await client.from('push_tokens').upsert({ token });
       if (error) {
         document.getElementById("pushStatus").innerText = "Error: " + error.message;
