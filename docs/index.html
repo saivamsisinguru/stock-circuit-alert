@@ -54,32 +54,25 @@
     <button onclick="logout()" style="background:#dc3545">Logout</button>
   </div>
   <script>
-    // Supabase config
     const SUPABASE_URL = "https://xwuajufeclbgmepazoqm.supabase.co";
     const SUPABASE_ANON_KEY = "sb_publishable_O0n5F8ccaaV-KLM6BQkWCQ_0Va-5pqU";
     const client = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
     let configPassword = "";
 
-    // Firebase config — REPLACE WITH YOUR REAL VALUES from Firebase Console
     const firebaseConfig = {
-  apiKey: "AIzaSyCUS3UkIl6J6lXfp6fZZqwvYyCgMNx-Lz4",
-  authDomain: "stock-alert-pwa.firebaseapp.com",
-  projectId: "stock-alert-pwa",
-  storageBucket: "stock-alert-pwa.firebasestorage.app",
-  messagingSenderId: "249296765321",
-  appId: "1:249296765321:web:88a5b155b574058bbe2158"
-};
+      apiKey: "AIzaSyCUS3UkIl6J6lXfp6fZZqwvYyCgMNx-Lz4",
+      authDomain: "stock-alert-pwa.firebaseapp.com",
+      projectId: "stock-alert-pwa",
+      storageBucket: "stock-alert-pwa.firebasestorage.app",
+      messagingSenderId: "249296765321",
+      appId: "1:249296765321:web:88a5b155b574058bbe2158"
+    };
     firebase.initializeApp(firebaseConfig);
-const messaging = firebase.messaging();
-// Register service worker manually at the correct scope
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('/stock-circuit-alert/sw.js', {scope: '/'})
-    .then((reg) => {
-      messaging.useServiceWorker(reg);
-      console.log('SW registered');
-    })
-    .catch((err) => console.error('SW error:', err));
-}
+    const messaging = firebase.messaging();
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/stock-circuit-alert/sw.js')
+        .then(reg => messaging.useServiceWorker(reg));
+    }
 
     async function loadPassword() {
       const { data, error } = await client.from('config').select('value').eq('key', 'password').single();
@@ -142,6 +135,12 @@ if ('serviceWorker' in navigator) {
           return;
         }
         const token = await messaging.getToken({ vapidKey: 'BIwtGjxw08FT7d21CUnonzKDhHnCi5Io710AJ-u7P4rz4bp-TVobm8Dj2YPQTT7uVnQCwJX38OmZzs7-GTiq7Bw' });
+        // Subscribe to topic via Edge Function
+        await fetch('https://xwuajufeclbgmepazoqm.supabase.co/functions/v1/push-notify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ topic_subscribe: 'circuit_alerts', token })
+        });
         await client.from('push_tokens').upsert({ token });
         document.getElementById("pushStatus").innerText = "Push enabled!";
         document.getElementById("subscribeBtn").style.display = "none";
