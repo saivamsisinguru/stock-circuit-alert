@@ -18,7 +18,7 @@ def load_config():
         cfg[row["key"]] = row["value"]
     return cfg
 
-# ---------- SEND PUSH (edge function) ----------
+# ---------- SEND PUSH (edge function - topic based) ----------
 def send_push(title, body):
     cfg = load_config()
     url = cfg.get("push_function_url")
@@ -49,7 +49,7 @@ def is_market_open():
 def main():
     cfg = load_config()
     circuit_percent = int(cfg.get("circuit_percent", "20"))
-        near_threshold  = int(cfg.get("near_threshold", "95"))
+    near_threshold  = int(cfg.get("near_threshold", "95"))
     max_price       = int(cfg.get("max_price", "500"))
 
     # TEMPORARY TEST – remove after successful push
@@ -75,12 +75,11 @@ def main():
         print("No stocks in stocks_daily. Run fetch_stocks.py first.")
         return
 
-    # Build a dict: {symbol: prev_close}
     stocks = {}
     for row in db_stocks:
         sym = row["symbol"].strip()
         prev = float(row["prev_close"])
-        if prev <= max_price:   # double-check
+        if prev <= max_price:
             stocks[sym] = prev
 
     if not stocks:
@@ -89,8 +88,6 @@ def main():
 
     print(f"Loaded {len(stocks)} stocks under ₹{max_price}")
 
-    # ---- GET CURRENT PRICES IN ONE BATCH ----
-    # Add .NS suffix and fetch 1-day data
     tickers = [s + ".NS" for s in stocks.keys()]
     try:
         data = yf.download(tickers, period="1d", progress=False, threads=True)
@@ -102,17 +99,13 @@ def main():
         print("No market data yet (maybe pre-open). Skipping.")
         return
 
-    # 'data' is a DataFrame with multi-level columns: (Price, Ticker)
-    # We need the 'Close' column (or 'Adj Close') for the current price
-    # If only one stock, data columns are flat; handle both cases.
     if len(tickers) == 1:
         close_prices = data['Close']
-        current_prices = {tickers[0]: close_prices.iloc[-1]}  # last available
+        current_prices = {tickers[0]: close_prices.iloc[-1]}
     else:
-        close_prices = data['Close']   # DataFrame with columns = tickers
-        current_prices = close_prices.iloc[-1].to_dict()  # last row
+        close_prices = data['Close']
+        current_prices = close_prices.iloc[-1].to_dict()
 
-    # ---- CHECK EACH STOCK ----
     for symbol, prev_close in stocks.items():
         ticker_key = symbol + ".NS"
         if ticker_key not in current_prices:
@@ -126,7 +119,6 @@ def main():
             curr = float(curr)
             prev_close = float(prev_close)
 
-            # Filter by max price again (shouldn't be needed, but safe)
             if curr > max_price:
                 continue
 
@@ -135,17 +127,14 @@ def main():
             upper_near = prev_close * (1 + circuit_percent / 100 * near_threshold / 100)
             lower_near = prev_close * (1 - circuit_percent / 100 * near_threshold / 100)
 
-            # Fetch alert record for this symbol
             db = supabase.table("circuit_alerts").select("*").eq("symbol", symbol).execute().data
             rec = db[0] if db else {}
 
-            # ---------- OPEN AT CIRCUIT CHECK ----------
             upper_suppress = False
             if rec.get("upper_circuit_open_date") != today_str:
                 if curr >= upper:
                     supabase.table("circuit_alerts").upsert({"symbol": symbol, "upper_circuit_open_date": today_str}).execute()
                     upper_suppress = True
-                    print(f"{symbol} opened at upper circuit, suppressing upper alerts.")
                 else:
                     supabase.table("circuit_alerts").upsert({"symbol": symbol, "upper_circuit_open_date": "2000-01-01"}).execute()
             else:
@@ -156,13 +145,11 @@ def main():
                 if curr <= lower:
                     supabase.table("circuit_alerts").upsert({"symbol": symbol, "lower_circuit_open_date": today_str}).execute()
                     lower_suppress = True
-                    print(f"{symbol} opened at lower circuit, suppressing lower alerts.")
                 else:
                     supabase.table("circuit_alerts").upsert({"symbol": symbol, "lower_circuit_open_date": "2000-01-01"}).execute()
             else:
                 lower_suppress = (rec.get("lower_circuit_open_date") == today_str)
 
-            # ---------- ALERTS ----------
             if curr >= upper_near and rec.get("last_upper_near_date") != today_str and not upper_suppress:
                 send_push(f"🚀 {symbol} near UPPER circuit", f"₹{curr:.2f} (Upper: ₹{upper:.2f})")
                 supabase.table("circuit_alerts").upsert({"symbol": symbol, "last_upper_near_date": today_str}).execute()
