@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
   <title>Stock Circuit Alerts</title>
-  <link rel="manifest" href="/stock-circuit-alert/manifest.json">
+  <link rel="manifest" href="manifest.json">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#1a1a2e">
@@ -70,7 +70,7 @@
     firebase.initializeApp(firebaseConfig);
     const messaging = firebase.messaging();
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/stock-circuit-alert/sw.js')
+      navigator.serviceWorker.register('sw.js')
         .then(reg => messaging.useServiceWorker(reg));
     }
 
@@ -135,7 +135,6 @@
           return;
         }
         const token = await messaging.getToken({ vapidKey: 'BIwtGjxw08FT7d21CUnonzKDhHnCi5Io710AJ-u7P4rz4bp-TVobm8Dj2YPQTT7uVnQCwJX38OmZzs7-GTiq7Bw' });
-        // Subscribe to topic via Edge Function
         await fetch('https://xwuajufeclbgmepazoqm.supabase.co/functions/v1/push-notify', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
