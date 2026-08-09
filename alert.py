@@ -62,8 +62,8 @@ def main():
     max_price       = int(cfg.get("max_price", "500"))
 
     # --- TEMPORARY TEST EMAIL (remove after test) ---
-    send_email("✅ Test Alert", "Your stock alert system is working!")
-    return
+    #send_email("✅ Test Alert", "Your stock alert system is working!")
+   # return
 
     # -------------------------------------------------
 
