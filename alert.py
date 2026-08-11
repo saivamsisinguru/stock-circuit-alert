@@ -58,12 +58,12 @@ def is_market_open():
 def main():
     cfg = load_config()
     circuit_percent = int(cfg.get("circuit_percent", "20"))
-    near_threshold  = int(cfg.get("near_threshold", "50"))
+    near_threshold  = int(cfg.get("near_threshold", "95"))
     max_price       = int(cfg.get("max_price", "500"))
 
-    # --- TEMPORARY TEST EMAIL (remove after test) ---
-    #send_email("✅ Test Alert", "Your stock alert system is working!")
-   # return
+     --- TEMPORARY TEST EMAIL (remove after test) ---
+    send_email("✅ Test Alert", "Your stock alert system is working!")
+    return
 
     # -------------------------------------------------
 
