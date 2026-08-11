@@ -180,5 +180,7 @@ def main():
         except Exception as e:
             print(f"Error processing {symbol}: {e}")
 
+print("Alert check complete.")
+
 if __name__ == "__main__":
     main()
