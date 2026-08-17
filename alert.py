@@ -61,7 +61,7 @@ def main():
     near_threshold  = int(cfg.get("near_threshold", "95"))
     max_price       = int(cfg.get("max_price", "500"))
 
-     --- TEMPORARY TEST EMAIL (remove after test) ---
+    # --- TEMPORARY TEST EMAIL (remove after test) ---
     send_email("✅ Test Alert", "Your stock alert system is working!")
     return
 
